@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tree Influence Check — AS 2870 Appendix H</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="logo.js"></script>
+<style>
+  :root{--bg:#0f1722;--panel:#16202e;--panel2:#1d2a3a;--line:#2a3a4f;--txt:#e8eef5;--muted:#9fb0c3;--accent:#3da9fc;--good:#34c77b;--bad:#ff5c6c;--warn:#ffb454;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  header{padding:18px 28px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  header .sub{color:var(--muted);font-size:13px}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 28px 90px;display:grid;grid-template-columns:1.18fr 0.82fr;gap:24px}
+  @media(max-width:940px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:0 0 14px;font-weight:650}
+  .card h2 .note{text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;font-size:12px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:0 0 4px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-bottom:12px}
+  .row.three{grid-template-columns:1fr 1fr 1fr}
+  .field{margin-bottom:0}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .sticky{position:sticky;top:22px}
+  .result-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .badge{font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px}
+  .badge.pass{background:rgba(52,199,123,.16);color:var(--good);border:1px solid var(--good)}
+  .badge.fail{background:rgba(255,92,108,.16);color:var(--bad);border:1px solid var(--bad)}
+  .badge.idle{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  table.out{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.out td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.out td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.out td.k{color:var(--muted)}
+  .check{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--panel2);margin-bottom:8px;font-size:13px;border:1px solid var(--line)}
+  .check .v{font-weight:650;white-space:nowrap}
+  .check.ok{border-color:rgba(52,199,123,.5)} .check.ok .v{color:var(--good)}
+  .check.no{border-color:rgba(255,92,108,.5)} .check.no .v{color:var(--bad)}
+  .check.warn{border-color:rgba(255,180,84,.5)} .check.warn .v{color:var(--warn)}
+  .actions{display:flex;gap:10px;margin-top:16px}
+  button{cursor:pointer;border:none;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:600;font-family:inherit}
+  button.primary{background:var(--accent);color:#04121f} button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .disclaimer{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+  .err{color:var(--bad);font-size:12.5px;margin-top:8px;min-height:1em}
+  .pill{display:inline-block;font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;margin-left:6px}
+  details{margin-top:10px} summary{cursor:pointer;color:var(--accent);font-size:13px}
+  .diagram{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tree Influence Check — AS 2870 Appendix H</h1>
+  <span class="sub">proximity-ratio assessment of trees near footings on reactive soil · required clearance D = ratio × mature height</span>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h2>Project details</h2>
+      <div class="row">
+        <div class="field"><label>Company / consultant</label><input id="company" value="Mayfair"></div>
+        <div class="field"><label>Job / reference no.</label><input id="jobno" placeholder="e.g. G9601"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Project / element</label><input id="project" placeholder="e.g. new dwelling — Tree 1 (SE corner)"></div>
+        <div class="field"><label>Project address</label><input id="address"></div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>Prepared by</label><input id="author" placeholder="Name"></div>
+        <div class="field"><label>Role / reg. no.</label><input id="role" placeholder="e.g. Design Engineer"></div>
+        <div class="field"><label>Date</label><input id="rdate" type="date"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Site &amp; tree <span class="note">— required clearance scales with site reactivity</span></h2>
+      <div class="row three">
+        <div class="field">
+          <label>Site classification / reactivity</label>
+          <select id="cls">
+            <option value="A">Class A — non-reactive (minimal)</option>
+            <option value="S">Class S — slightly reactive (low risk)</option>
+            <option value="M" selected>Class M — moderately reactive (moderate)</option>
+            <option value="H1">Class H1 — highly reactive (high)</option>
+            <option value="H2">Class H2 — very highly reactive (high)</option>
+            <option value="E">Class E — extremely reactive (high)</option>
+          </select>
+          <div class="hint" id="clsHint">Sets the base proximity ratio.</div>
+        </div>
+        <div class="field">
+          <label>Tree arrangement</label>
+          <select id="arr"><option value="single">Single tree</option><option value="group">Row / group of trees (×1.5)</option></select>
+          <div class="hint">Rows/groups extend the influence 50%.</div>
+        </div>
+        <div class="field">
+          <label>Proximity ratio (D/H) required</label>
+          <input id="ratio" type="number" step="any" value="">
+          <div class="hint" id="ratioHint">Blank = auto from class &amp; arrangement.</div>
+        </div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>Mature tree height H (m)</label><input id="H" type="number" step="any" value="12"><div class="hint">Species' mature height, not current.</div></div>
+        <div class="field"><label>Distance tree → footing D (m)</label><input id="D" type="number" step="any" value="9"><div class="hint">Trunk to nearest footing/building.</div></div>
+        <div class="field"><label>Tree water demand <span class="pill">info</span></label>
+          <select id="wd"><option value="">—</option><option>High</option><option>Moderate</option><option>Low</option></select>
+          <div class="hint">Not factored by AS 2870; high-demand species warrant caution.</div>
+        </div>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="card">
+      <h2>Optional — depth of influence <span class="note">(context, not part of the proximity check)</span></h2>
+      <div class="row three">
+        <div class="field"><label>Design suction change depth H<sub>s</sub> (m)</label><input id="Hs" type="number" step="any" placeholder="e.g. 2.3"><div class="hint">AS 2870 Table 2.4 by climate zone (1.5–4.0 m).</div></div>
+        <div class="field"><label>Footing / pier depth (m)</label><input id="pier" type="number" step="any" placeholder="optional"><div class="hint">For a quick depth-vs-Hs note.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sticky">
+      <div class="card">
+        <div class="result-head">
+          <span id="verdict" class="badge idle">Awaiting valid inputs</span>
+          <span style="color:var(--muted);font-size:12.5px" id="verdictSub"></span>
+        </div>
+        <div id="checks"></div>
+        <table class="out" id="outTable"><tbody></tbody></table>
+        <div class="actions">
+          <button class="primary" id="pdfBtn" disabled>Download Comps</button>
+          <button class="ghost" id="resetBtn">Reset</button>
+        </div>
+        <details><summary>Method &amp; assumptions</summary>
+          <div class="hint" style="margin-top:8px">
+            AS 2870 Appendix H proximity-ratio approach (after Cameron &amp; Earl): the minimum tree clearance is
+            D<sub>min</sub> = ratio × H, where H is the species' mature height and the ratio is set by site reactivity —
+            <b>0.5</b> (slightly reactive / low risk), <b>0.75</b> (moderately reactive), <b>1.0</b> (highly/very/extremely
+            reactive / high risk) — increased <b>×1.5</b> for rows or groups of trees. If the actual distance D is less than
+            D<sub>min</sub> the footing is within the zone of influence and must be designed for the additional reactive
+            movement from tree drying (deeper design suction change / increased differential movement) per AS 2870 Appendix H,
+            or the tree removed/relocated. AS 2870 does not factor tree species/water demand into the ratio.
+          </div>
+        </details>
+        <div class="disclaimer">
+          Planning/clearance screen only. Footing design within the zone of influence requires a site-specific geotechnical
+          assessment. Confirm the site classification, mature tree height and method against AS 2870-2011 Appendix H and the
+          geotechnical report. The design engineer remains responsible; outputs do not constitute design certification.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+const fmt = (x,dp=2) => (x===null||x===undefined||!isFinite(x)) ? "—" : Number(x).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp});
+$("rdate").valueAsDate = new Date();
+
+const RISK = {
+  A:{label:"Class A — non-reactive", base:0, risk:"minimal"},
+  S:{label:"Class S — slightly reactive", base:0.5, risk:"low"},
+  M:{label:"Class M — moderately reactive", base:0.75, risk:"moderate"},
+  H1:{label:"Class H1 — highly reactive", base:1.0, risk:"high"},
+  H2:{label:"Class H2 — very highly reactive", base:1.0, risk:"high"},
+  E:{label:"Class E — extremely reactive", base:1.0, risk:"high"}
+};
+
+document.querySelectorAll("input,select").forEach(el=>{ el.addEventListener("input",calc); el.addEventListener("change",calc); });
+$("resetBtn").addEventListener("click",()=>location.reload());
+
+let LAST=null;
+function calc(){
+  $("err").textContent="";
+  const clsK=$("cls").value, R=RISK[clsK];
+  const arr=$("arr").value, arrF = arr==="group"?1.5:1.0;
+  const H=num("H"), D=num("D");
+  let ratio=num("ratio");
+  const autoRatio = +(R.base*arrF).toFixed(3);
+  $("clsHint").textContent = "Base ratio "+(R.base||0)+" ("+R.risk+" risk).";
+  $("ratioHint").textContent = "Blank = auto ("+fmt(autoRatio,2)+" = "+(R.base||0)+"×"+fmt(arrF,1)+").";
+  if(ratio===null) ratio=autoRatio;
+
+  const need=[];
+  if(H===null||H<=0) need.push("mature height H");
+  if(D===null||D<0) need.push("distance D");
+  if(need.length){ setIdle("Enter: "+need.join(", ")); return; }
+
+  const nonReactive = R.base===0;
+  const Dmin = ratio*H;
+  const actual = H>0 ? D/H : 0;
+  const pass = nonReactive ? true : (D>=Dmin);
+  const shortfall = Dmin - D;
+
+  // optional Hs / pier note
+  const Hs=num("Hs"), pier=num("pier");
+  let pierNote="";
+  if(Hs&&pier){ pierNote = pier>=Hs ? "Pier ≥ Hs (founds below design suction change)" : "Pier < Hs — review founding depth vs Hs"; }
+
+  const o={clsK,clsLabel:R.label,risk:R.risk,nonReactive,arr,arrF,base:R.base,ratio,autoRatio,H,D,Dmin,actual,pass,shortfall,
+    wd:$("wd").value,Hs,pier,pierNote};
+  LAST=o; render(o);
+}
+function setIdle(m){ LAST=null; $("verdict").className="badge idle"; $("verdict").textContent="Awaiting valid inputs"; $("verdictSub").textContent=""; $("checks").innerHTML=""; $("outTable").querySelector("tbody").innerHTML=""; $("pdfBtn").disabled=true; if(m)$("err").textContent=m; }
+
+function render(o){
+  const v=$("verdict");
+  if(o.nonReactive){ v.className="badge pass"; v.textContent="NON-REACTIVE — N/A"; v.nextElementSibling.textContent="tree-induced reactive movement not a design concern on Class A"; }
+  else { v.className="badge "+(o.pass?"pass":"fail"); v.textContent=o.pass?"OUTSIDE INFLUENCE ZONE":"WITHIN INFLUENCE ZONE";
+    v.nextElementSibling.textContent = "D = "+fmt(o.D,1)+" m vs required "+fmt(o.Dmin,1)+" m"; }
+
+  const chk=[];
+  if(o.nonReactive){ chk.push(checkInfo("Class A — non-reactive","proximity check not applicable")); }
+  else {
+    chk.push(check(o.pass,"Distance ≥ required clearance", fmt(o.D,1)+" / "+fmt(o.Dmin,1)+" m"));
+    chk.push(checkInfo("Proximity ratio D/H", fmt(o.actual,2)+" vs "+fmt(o.ratio,2)+" required"));
+    if(!o.pass) chk.push(checkWarn("Within zone — design for tree effects", "short by "+fmt(o.shortfall,1)+" m"));
+  }
+  if(o.wd==="High" && !o.nonReactive) chk.push(checkWarn("High water-demand species","extra caution (not in AS 2870 ratio)"));
+  if(o.pierNote) chk.push(checkInfo("Founding vs Hs", o.pierNote));
+  $("checks").innerHTML=chk.join("");
+
+  const rows=[
+    ["Site classification", o.clsLabel+" <span class='pill'>"+o.risk+" risk</span>"],
+    ["Tree arrangement", o.arr==="group"?"Row / group (×1.5)":"Single tree (×1.0)"],
+    ["Proximity ratio required", fmt(o.ratio,2)+(num("ratio")===null?" (auto)":" (entered)")],
+    ["Mature tree height H", fmt(o.H,1)+" m"],
+    ["Distance to footing D", fmt(o.D,1)+" m"],
+    ["Required clearance Dmin = ratio·H", fmt(o.Dmin,1)+" m"],
+    ["Actual ratio D/H", fmt(o.actual,2)],
+  ];
+  if(!o.nonReactive) rows.push(["Margin (D − Dmin)", (o.shortfall<=0?"+":"")+fmt(-o.shortfall,1)+" m"]);
+  if(o.Hs) rows.push(["Design suction depth Hs", fmt(o.Hs,1)+" m"]);
+  if(o.wd) rows.push(["Tree water demand", o.wd+" (info)"]);
+  $("outTable").querySelector("tbody").innerHTML = rows.map(r=>`<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  $("pdfBtn").disabled=false;
+}
+function check(ok,l,v){return `<div class="check ${ok?'ok':'no'}"><span>${ok?'✓':'✗'} ${l}</span><span class="v">${v}</span></div>`;}
+function checkWarn(l,v){return `<div class="check warn"><span>⚠ ${l}</span><span class="v">${v}</span></div>`;}
+function checkInfo(l,v){return `<div class="check"><span>• ${l}</span><span class="v">${v}</span></div>`;}
+calc();
+
+/* ---------- PDF ---------- */
+function san(s){return String(s).replace(/Δ/g,"d").replace(/→/g,"->").replace(/−/g,"-").replace(/·/g,".").replace(/≥/g,">=").replace(/≤/g,"<=").replace(/×/g,"x").replace(/²/g,"^2").replace(/³/g,"^3").replace(/✓/g,"[x]").replace(/✗/g,"[ ]").replace(/⚠/g,"!").replace(/[\uD800-\uDFFF]/g,"").replace(/[Ͱ-Ͽ⅐-↏←-⇿∀-⋿⌀-➿]/g,"?");}
+$("pdfBtn").addEventListener("click",()=>{ if(!LAST) return; try{ buildPDF(LAST); }catch(e){ console.error(e); alert("PDF lib not loaded; using print."); window.print(); } });
+
+function buildPDF(o){
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:"mm",format:"a4"});
+  const _t=doc.text.bind(doc); doc.text=function(s,...r){return _t(Array.isArray(s)?s.map(san):san(s),...r);};
+  const _s=doc.splitTextToSize.bind(doc); doc.splitTextToSize=function(s,...r){return _s(san(String(s)),...r);};
+  const M=18,W=210,right=W-M; let y=M; const field=id=>($(id).value||"—"); const txt=(s,x,yy,op)=>doc.text(String(s),x,yy,op);
+
+  let tx=M; if(window.MAYFAIR_LOGO&&window.MAYFAIR_LOGO.dataUri){ const lw=40,lh=lw*window.MAYFAIR_LOGO.h/window.MAYFAIR_LOGO.w;
+    try{ doc.addImage(window.MAYFAIR_LOGO.dataUri,window.MAYFAIR_LOGO.type||"PNG",M,9,lw,lh); tx=M+lw+6; }catch(e){} }
+  doc.setTextColor(20,28,38); doc.setFont("helvetica","bold"); doc.setFontSize(14); txt(field("company")+" — Tree Influence Check", tx,14);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90,105,120); txt("AS 2870 Appendix H — tree proximity to footings on reactive soil", tx,19.5);
+  doc.setDrawColor(244,180,130); doc.setLineWidth(0.8); doc.line(M,24,W-M,24); doc.setLineWidth(0.2); y=32; doc.setTextColor(20,28,38);
+
+  const passTxt = o.nonReactive ? "NON-REACTIVE (Class A) — proximity check not applicable" : (o.pass?"OUTSIDE ZONE OF INFLUENCE":"WITHIN ZONE OF INFLUENCE");
+  doc.setFillColor(o.pass?52:255,o.pass?199:92,o.pass?123:108); doc.roundedRect(M,y-5,W-2*M,11,2,2,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(255);
+  txt(passTxt+(o.nonReactive?"":"  — D="+fmt(o.D,1)+" m vs Dmin="+fmt(o.Dmin,1)+" m"), M+4, y+2.5);
+  doc.setTextColor(20,28,38); y+=14;
+
+  y=kv(doc,"Project",[["Project / element",field("project")],["Job / ref.",field("jobno")],["Address",field("address")],["Date",field("rdate")],["Prepared by",field("author")],["Role / reg.",field("role")]],M,y,W);
+
+  y=tbl(doc,"Tree proximity assessment (AS 2870 Appendix H)",[
+    ["Site classification / risk", o.clsLabel.replace(/—/g,"-")+"  ("+o.risk+" risk)"],
+    ["Tree arrangement", o.arr==="group"?"Row / group of trees (factor x1.5)":"Single tree (factor x1.0)"],
+    ["Base proximity ratio", fmt(o.base,2)+"  (by reactivity)"],
+    ["Required proximity ratio  D/H", fmt(o.ratio,2)+(num("ratio")===null?"  (auto = base x arrangement)":"  (entered)")],
+    ["Mature tree height  H", fmt(o.H,2)+" m"],
+    ["Distance tree to footing  D", fmt(o.D,2)+" m"],
+    ["Required clearance  Dmin = ratio x H", fmt(o.Dmin,2)+" m"],
+    ["Actual ratio  D/H", fmt(o.actual,2)],
+    o.nonReactive?null:["Margin  D - Dmin", (o.shortfall<=0?"+":"-")+fmt(Math.abs(o.shortfall),2)+" m"],
+    o.wd?["Tree water demand (info)", o.wd+" - not factored by AS 2870 ratio"]:null,
+    o.Hs?["Design suction change depth Hs", fmt(o.Hs,2)+" m"]:null,
+    o.pierNote?["Founding depth vs Hs", o.pierNote]:null
+  ].filter(Boolean),M,y,W);
+
+  // assessment statement
+  y=ensure(doc,y,20,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); txt("Assessment",M,y); y+=5.5;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+  const stmt = o.nonReactive
+    ? "The site is Class A (non-reactive); tree-induced reactive soil movement is not a design concern and the proximity check does not apply."
+    : (o.pass
+      ? "The tree is "+fmt(o.D,1)+" m from the footing, meeting the required clearance of "+fmt(o.Dmin,1)+" m (D/H = "+fmt(o.actual,2)+" >= "+fmt(o.ratio,2)+"). The footing lies outside the zone of significant tree influence; standard design for the site classification applies."
+      : "The tree is "+fmt(o.D,1)+" m from the footing, short of the required clearance of "+fmt(o.Dmin,1)+" m by "+fmt(o.shortfall,1)+" m (D/H = "+fmt(o.actual,2)+" < "+fmt(o.ratio,2)+"). The footing is within the zone of influence: design for the additional reactive movement from tree drying (deeper design suction change / increased differential movement) per AS 2870 Appendix H, or remove/relocate the tree.");
+  y=wrap(doc,stmt,M,y,W-2*M,4.6);
+
+  y=ensure(doc,y+3,18,M); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
+  y=wrap(doc,"Method: AS 2870 Appendix H proximity ratios (after Cameron & Earl) - Dmin = ratio x H, ratio 0.5/0.75/1.0 for low/moderate/high reactivity, x1.5 for rows or groups. AS 2870 does not factor tree species/water demand. Planning/clearance screen only; footing design within the influence zone needs a site-specific geotechnical assessment. Confirm against AS 2870-2011 and the geotechnical report. Calculation aid - not design certification.",M,y,W-2*M,3.4);
+
+  y=ensure(doc,y+4,20,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
+  doc.setFontSize(8.5); doc.setTextColor(90); txt("Prepared by: "+field("author")+"  "+field("role"),M,y+14); txt("Date: "+field("rdate"),right-70,y+14);
+
+  doc.save((field("jobno")||"tree").replace(/[^\w -]+/g,"_").trim()+" - Comps.pdf");
+}
+function ensure(doc,y,need,M){ if(y+need>284){doc.addPage(); return M;} return y; }
+function wrap(doc,s,x,y,w,lh){ doc.splitTextToSize(String(s),w).forEach(l=>{y=ensure(doc,y,lh,18); doc.text(l,x,y); y+=lh;}); return y; }
+function kv(doc,title,pairs,M,y,W){
+  y=ensure(doc,y,14,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text(title,M,y); y+=5;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5); const cw=(W-2*M)/2;
+  for(let i=0;i<pairs.length;i+=2){ y=ensure(doc,y,6,M);
+    [pairs[i],pairs[i+1]].forEach((p,j)=>{ if(!p)return; const x=M+j*cw; doc.setTextColor(120); doc.text(p[0]+":",x,y);
+      doc.setTextColor(20,28,38); const lb=doc.getTextWidth(p[0]+": "); doc.text(String(p[1]),x+lb+1,y); }); y+=5.4; }
+  return y+2;
+}
+function tbl(doc,title,rows,M,y,W){
+  y=ensure(doc,y,16,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text(title,M,y); y+=4;
+  const x2=W-M; doc.setFontSize(9.3);
+  rows.forEach((r,i)=>{ y=ensure(doc,y,6,M);
+    if(i%2===0){ doc.setFillColor(244,247,250); doc.rect(M,y-3.4,W-2*M,5.6,"F"); }
+    doc.setFont("helvetica","normal"); doc.setTextColor(60); doc.text(String(r[0]),M+1.5,y);
+    doc.setFont("helvetica","bold"); doc.setTextColor(20,28,38); doc.text(String(r[1]),x2-1.5,y,{align:"right"}); y+=5.6; });
+  return y+3;
+}
+</script>
+</body>
+</html>
