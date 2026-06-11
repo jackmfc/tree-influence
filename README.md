@@ -27,6 +27,23 @@ Inputs: site classification, tree arrangement (single / row-group), mature heigh
 editable proximity ratio (auto-derived), optional tree water demand (informational) and design suction
 depth H<sub>s</sub> / pier depth for a quick founding-vs-H<sub>s</sub> note.
 
+## Rigid slab (raft) check
+
+Beyond the clearance screen, an optional **rigid-raft differential-movement check** (SLOG-style):
+
+- estimates the **tree movement increment** from Appendix H as `Δys = α · ys · (1 − D/Dmin)` — i.e. it
+  grows as the tree sits further inside the zone of influence (α editable);
+- gives the **design surface movement** `ys,design = ys + Δys` and the resulting **effective site class**
+  (so you see when a tree pushes, e.g., H1 → E);
+- compares the **differential deflection** against **AS 2870 Table 4.1** for the wall type — clad frame
+  (L/300, 40 mm), articulated masonry veneer (L/400, 30 mm), articulated full masonry (L/800, 15 mm),
+  full masonry (L/2000, 10 mm), all editable;
+- uses your **slab design Δ** (e.g. from SLOG) when entered for the real check, otherwise a conservative
+  `k · ys,design` estimate flagged as indicative.
+
+This is a **screening check**, not the full Mitchell-method raft design (AS 2870 Section 4 / Appendix F,
+e.g. SLOG), which governs.
+
 ## Important
 - AS 2870 **does not** factor tree species / water demand into the ratio — the tool flags high-water-demand
   species for caution only.

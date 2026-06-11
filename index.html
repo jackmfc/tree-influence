@@ -121,6 +121,36 @@
         <div class="field"><label>Footing / pier depth (m)</label><input id="pier" type="number" step="any" placeholder="optional"><div class="hint">For a quick depth-vs-Hs note.</div></div>
       </div>
     </div>
+
+    <div class="card">
+      <h2>Rigid slab (raft) check <span class="note">— differential movement vs AS 2870 Table 4.1</span></h2>
+      <label style="display:flex;gap:8px;align-items:center;color:var(--txt);margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="rsOn" style="width:auto" checked> Include rigid raft differential-movement check (SLOG-style)
+      </label>
+      <div id="rsFields">
+        <div class="row three">
+          <div class="field"><label>Design surface movement y<sub>s</sub> (mm)</label><input id="ys" type="number" step="any" value=""><div class="hint" id="ysHint">Blank = AS 2870 value for the site class.</div></div>
+          <div class="field"><label>Tree movement factor α</label><input id="alpha" type="number" step="any" value="1.0"><div class="hint">Appendix H estimate: Δy<sub>s</sub> = α·y<sub>s</sub>·penetration.</div></div>
+          <div class="field"><label>Slab length L (m)</label><input id="L" type="number" step="any" value="12"><div class="hint">Design direction (for Δ/L).</div></div>
+        </div>
+        <div class="row three">
+          <div class="field"><label>Wall / construction</label>
+            <select id="wall">
+              <option value="clad">Clad / timber frame (L/300, 40mm)</option>
+              <option value="amv" selected>Articulated masonry veneer (L/400, 30mm)</option>
+              <option value="mv">Masonry veneer (L/400, 30mm)</option>
+              <option value="afm">Articulated full masonry (L/800, 15mm)</option>
+              <option value="fm">Full masonry (L/2000, 10mm)</option>
+            </select>
+          </div>
+          <div class="field"><label>Allowable Δ (mm)</label><input id="dallow" type="number" step="any" value=""><div class="hint" id="dallowHint">Blank = Table 4.1 for wall type.</div></div>
+          <div class="field"><label>Slab design Δ (mm) <span class="pill">optional</span></label><input id="ddes" type="number" step="any" placeholder="from SLOG / design"><div class="hint">Blank = conservative k·y<sub>s,design</sub>.</div></div>
+        </div>
+        <div class="row three">
+          <div class="field"><label>Mound factor k</label><input id="kf" type="number" step="any" value="1.0"><div class="hint">Fraction of y<sub>s</sub> as differential deflection (used when Δ not entered).</div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div>
@@ -171,8 +201,20 @@ const RISK = {
   H2:{label:"Class H2 — very highly reactive", base:1.0, risk:"high"},
   E:{label:"Class E — extremely reactive", base:1.0, risk:"high"}
 };
+// AS 2870 design surface movement ys (mm) by class (upper bound of range)
+const YS_CLASS = {A:0,S:20,M:40,H1:60,H2:75,E:90};
+function classOf(ys){ if(ys<=0)return"A"; if(ys<=20)return"S"; if(ys<=40)return"M"; if(ys<=60)return"H1"; if(ys<=75)return"H2"; return"E"; }
+// AS 2870 Table 4.1 max differential deflection by construction (Δmax mm, Δ/L ratio)
+const WALLS = {
+  clad:{label:"Clad / timber frame", dmax:40, ratio:300},
+  amv: {label:"Articulated masonry veneer", dmax:30, ratio:400},
+  mv:  {label:"Masonry veneer", dmax:30, ratio:400},
+  afm: {label:"Articulated full masonry", dmax:15, ratio:800},
+  fm:  {label:"Full masonry", dmax:10, ratio:2000}
+};
 
 document.querySelectorAll("input,select").forEach(el=>{ el.addEventListener("input",calc); el.addEventListener("change",calc); });
+$("rsOn").addEventListener("change",()=>{ $("rsFields").style.opacity=$("rsOn").checked?"1":"0.4"; });
 $("resetBtn").addEventListener("click",()=>location.reload());
 
 let LAST=null;
@@ -203,8 +245,29 @@ function calc(){
   let pierNote="";
   if(Hs&&pier){ pierNote = pier>=Hs ? "Pier ≥ Hs (founds below design suction change)" : "Pier < Hs — review founding depth vs Hs"; }
 
+  // rigid slab (raft) differential-movement check
+  let rs=null;
+  const ysAuto = YS_CLASS[clsK]!==undefined?YS_CLASS[clsK]:40;
+  $("ysHint").textContent = "Blank = "+ysAuto+" mm (Class "+clsK+", AS 2870).";
+  if($("rsOn").checked){
+    const Wk=$("wall").value, Wd=WALLS[Wk]||WALLS.amv;
+    let ys=num("ys"); if(ys===null) ys=ysAuto;
+    const alpha=num("alpha")!==null?num("alpha"):1, L=num("L")||0, kf=num("kf")!==null?num("kf"):1;
+    const dallowAuto = L>0 ? Math.min(Wd.dmax, L*1000/Wd.ratio) : Wd.dmax;
+    $("dallowHint").textContent = "Blank = "+fmt(dallowAuto,0)+" mm (Δmax "+Wd.dmax+", L/"+Wd.ratio+").";
+    let dallow=num("dallow"); if(dallow===null) dallow=dallowAuto;
+    const pen = (nonReactive||Dmin<=0) ? 0 : Math.max(0, Math.min(1, 1 - D/Dmin));   // 0 outside zone, →1 at trunk
+    const dys_tree = alpha*ys*pen;
+    const ys_design = ys + dys_tree;
+    const effClass = classOf(ys_design);
+    let ddes=num("ddes"); const ddesAuto = kf*ys_design; const ddesUsed = ddes!==null?ddes:ddesAuto;
+    const rspass = ddesUsed <= dallow;
+    rs={wallLabel:Wd.label,ratio:Wd.ratio,dmax:Wd.dmax,ys,ysAuto,alpha,L,kf,dallow,dallowAuto,dallowEntered:num("dallow")!==null,
+        pen,dys_tree,ys_design,effClass,clsK,ddes,ddesAuto,ddesUsed,ddesEntered:ddes!==null,rspass};
+  }
+
   const o={clsK,clsLabel:R.label,risk:R.risk,nonReactive,arr,arrF,base:R.base,ratio,autoRatio,H,D,Dmin,actual,pass,shortfall,
-    wd:$("wd").value,Hs,pier,pierNote};
+    wd:$("wd").value,Hs,pier,pierNote,rs};
   LAST=o; render(o);
 }
 function setIdle(m){ LAST=null; $("verdict").className="badge idle"; $("verdict").textContent="Awaiting valid inputs"; $("verdictSub").textContent=""; $("checks").innerHTML=""; $("outTable").querySelector("tbody").innerHTML=""; $("pdfBtn").disabled=true; if(m)$("err").textContent=m; }
@@ -224,6 +287,12 @@ function render(o){
   }
   if(o.wd==="High" && !o.nonReactive) chk.push(checkWarn("High water-demand species","extra caution (not in AS 2870 ratio)"));
   if(o.pierNote) chk.push(checkInfo("Founding vs Hs", o.pierNote));
+  if(o.rs){ const r=o.rs;
+    if(r.ddesEntered) chk.push(check(r.rspass,"Rigid raft Δ ≤ AS 2870 Table 4.1", fmt(r.ddesUsed,0)+" / "+fmt(r.dallow,0)+" mm"));
+    else if(r.rspass) chk.push(check(true,"Rigid raft Δ ≤ Table 4.1 (est.)", fmt(r.ddesUsed,0)+" / "+fmt(r.dallow,0)+" mm"));
+    else chk.push(checkWarn("Rigid raft Δ may exceed Table 4.1 (est.)", fmt(r.ddesUsed,0)+" > "+fmt(r.dallow,0)+" mm — verify by raft design"));
+    if(r.dys_tree>0) chk.push(checkWarn("Tree adds movement (Appendix H est.)", "+"+fmt(r.dys_tree,0)+" mm → ys "+fmt(r.ys_design,0)+" mm (Cl "+r.effClass+")"));
+  }
   $("checks").innerHTML=chk.join("");
 
   const rows=[
@@ -238,6 +307,13 @@ function render(o){
   if(!o.nonReactive) rows.push(["Margin (D − Dmin)", (o.shortfall<=0?"+":"")+fmt(-o.shortfall,1)+" m"]);
   if(o.Hs) rows.push(["Design suction depth Hs", fmt(o.Hs,1)+" m"]);
   if(o.wd) rows.push(["Tree water demand", o.wd+" (info)"]);
+  if(o.rs){ const r=o.rs;
+    rows.push(["— Rigid slab: ys (site)", fmt(r.ys,0)+" mm"+(r.ddesEntered?"":"")]);
+    if(r.dys_tree>0) rows.push(["— Tree movement Δys (α·ys·pen)", "+"+fmt(r.dys_tree,0)+" mm  (pen "+fmt(r.pen,2)+")"]);
+    rows.push(["— Design ys (with tree)", fmt(r.ys_design,0)+" mm → Class "+r.effClass]);
+    rows.push(["— Design Δ "+(r.ddesEntered?"(entered)":"(k·ys)"), fmt(r.ddesUsed,0)+" mm"]);
+    rows.push(["— Allowable Δ ("+r.wallLabel+")", fmt(r.dallow,0)+" mm"+(r.dallowEntered?" (entered)":"")]);
+  }
   $("outTable").querySelector("tbody").innerHTML = rows.map(r=>`<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join("");
   $("pdfBtn").disabled=false;
 }
@@ -285,6 +361,21 @@ function buildPDF(o){
     o.pierNote?["Founding depth vs Hs", o.pierNote]:null
   ].filter(Boolean),M,y,W);
 
+  // rigid slab (raft) check
+  if(o.rs){ const r=o.rs;
+    y=tbl(doc,"Rigid slab (raft) differential-movement check (AS 2870 Table 4.1)",[
+      ["Design surface movement  ys (site)", fmt(r.ys,0)+" mm  (Class "+r.clsK+")"],
+      ["Tree movement factor  alpha", fmt(r.alpha,2)],
+      ["Zone penetration  1 - D/Dmin", fmt(r.pen,2)],
+      ["Tree movement  d_ys = alpha.ys.pen", "+"+fmt(r.dys_tree,0)+" mm"],
+      ["Design ys (with tree)", fmt(r.ys_design,0)+" mm  -> Class "+r.effClass],
+      ["Construction / wall type", r.wallLabel],
+      ["Allowable differential  d_allow", fmt(r.dallow,0)+" mm  (Dmax "+r.dmax+", L/"+r.ratio+", L="+fmt(r.L,1)+" m)"+(r.dallowEntered?" [entered]":"")],
+      ["Design differential  d_design", fmt(r.ddesUsed,0)+" mm"+(r.ddesEntered?"  [entered, e.g. SLOG]":"  [k.ys_design, k="+fmt(r.kf,2)+"]")],
+      ["Rigid raft adequacy", r.rspass?"OK - d_design <= d_allow":"EXCEEDS - stiffen raft / site-specific design"]
+    ],M,y,W);
+  }
+
   // assessment statement
   y=ensure(doc,y,20,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); txt("Assessment",M,y); y+=5.5;
   doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
@@ -294,9 +385,13 @@ function buildPDF(o){
       ? "The tree is "+fmt(o.D,1)+" m from the footing, meeting the required clearance of "+fmt(o.Dmin,1)+" m (D/H = "+fmt(o.actual,2)+" >= "+fmt(o.ratio,2)+"). The footing lies outside the zone of significant tree influence; standard design for the site classification applies."
       : "The tree is "+fmt(o.D,1)+" m from the footing, short of the required clearance of "+fmt(o.Dmin,1)+" m by "+fmt(o.shortfall,1)+" m (D/H = "+fmt(o.actual,2)+" < "+fmt(o.ratio,2)+"). The footing is within the zone of influence: design for the additional reactive movement from tree drying (deeper design suction change / increased differential movement) per AS 2870 Appendix H, or remove/relocate the tree.");
   y=wrap(doc,stmt,M,y,W-2*M,4.6);
+  if(o.rs){ const r=o.rs; y+=1.5;
+    const rstmt = "Rigid raft: with the tree increment, the design surface movement is "+fmt(r.ys_design,0)+" mm (Class "+r.effClass+"). The "+(r.ddesEntered?"design":"estimated")+" differential deflection of "+fmt(r.ddesUsed,0)+" mm "+(r.rspass?"is within":"exceeds")+" the AS 2870 Table 4.1 limit of "+fmt(r.dallow,0)+" mm for "+r.wallLabel.toLowerCase()+". "+(r.rspass?"A standard rigid raft is provisionally adequate, subject to full AS 2870/SLOG design.":"The raft must be stiffened or designed site-specifically (AS 2870 Section 4 / Appendix F, e.g. SLOG), or the tree effect reduced.");
+    y=wrap(doc,rstmt,M,y,W-2*M,4.6);
+  }
 
   y=ensure(doc,y+3,18,M); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
-  y=wrap(doc,"Method: AS 2870 Appendix H proximity ratios (after Cameron & Earl) - Dmin = ratio x H, ratio 0.5/0.75/1.0 for low/moderate/high reactivity, x1.5 for rows or groups. AS 2870 does not factor tree species/water demand. Planning/clearance screen only; footing design within the influence zone needs a site-specific geotechnical assessment. Confirm against AS 2870-2011 and the geotechnical report. Calculation aid - not design certification.",M,y,W-2*M,3.4);
+  y=wrap(doc,"Method: AS 2870 Appendix H proximity ratios (after Cameron & Earl) - Dmin = ratio x H, ratio 0.5/0.75/1.0 for low/moderate/high reactivity, x1.5 for rows or groups. Rigid-slab check: tree movement estimated as d_ys = alpha.ys.(1-D/Dmin) (an Appendix H approximation), design differential vs AS 2870 Table 4.1; this is a screening check, not the full Mitchell-method raft design (AS 2870 Section 4 / Appendix F, e.g. SLOG), which governs. AS 2870 does not factor tree species/water demand. Confirm all values against AS 2870-2011 and the geotechnical report. Calculation aid - not design certification.",M,y,W-2*M,3.4);
 
   y=ensure(doc,y+4,20,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
   doc.setFontSize(8.5); doc.setTextColor(90); txt("Prepared by: "+field("author")+"  "+field("role"),M,y+14); txt("Date: "+field("rdate"),right-70,y+14);
